@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<style>
+  html, body { margin:0; padding:0; width:100%; height:100%; background:#11073b; overflow:hidden; }
+  canvas { display:block; touch-action:none; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<script>
+  const canvas = document.getElementById("c");
+  const ctx = canvas.getContext("2d");
+  const pts = [];
+  const MAX = 100;
+  let active = false;
+
+  function resize() {
+    const dpr = Math.max(1, devicePixelRatio);
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
+    canvas.style.width = innerWidth + "px";
+    canvas.style.height = innerHeight + "px";
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.lineWidth = 2;
+  }
+
+  addEventListener("resize", resize);
+  resize();
+
+  function map(v, a1, a2, b1, b2) {
+    return a2 === a1 ? b1 : b1 + (b2 - b1) * ((v - a1) / (a2 - a1));
+  }
+
+  function rand(min, max) {
+    return Math.random() * (max - min) + min;
+  }
+
+  function addPoint(x, y) {
+    pts.push({ posX:x, posY:y, offX:0, offY:0 });
+    if (pts.length > MAX) pts.shift();
+  }
+
+  canvas.addEventListener("pointerdown", (e) => {
+    active = true;
+    canvas.setPointerCapture(e.pointerId);
+    const r = canvas.getBoundingClientRect();
+    addPoint(e.clientX - r.left, e.clientY - r.top);
+  });
+
+  canvas.addEventListener("pointermove", (e) => {
+    if (!active) return;
+    const r = canvas.getBoundingClientRect();
+    addPoint(e.clientX - r.left, e.clientY - r.top);
+  });
+
+  canvas.addEventListener("pointerup", () => active = false);
+  canvas.addEventListener("pointercancel", () => active = false);
+  canvas.addEventListener("pointerleave", () => active = false);
+
+  function draw() {
+    ctx.fillStyle = "#11073b";
+    ctx.fillRect(0, 0, innerWidth, innerHeight);
+
+    ctx.strokeStyle = "rgb(216,207,255)";
+    ctx.beginPath();
+    for (let i = 0; i < pts.length; i++) {
+      let j = map(i, 0, Math.max(1, pts.length - 1), 20, 0.5);
+      pts[i].offX += rand(-j, j);
+      pts[i].offY += rand(-j, j);
+      let x = pts[i].posX + pts[i].offX;
+      let y = pts[i].posY + pts[i].offY;
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+    requestAnimationFrame(draw);
+  }
+
+  requestAnimationFrame(draw);
+</script>
+</body>
+</html>
