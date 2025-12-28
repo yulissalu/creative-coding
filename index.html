@@ -13,73 +13,116 @@
 <script>
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
-  const pts = [];
-  const MAX = 100;
-  let active = false;
+
+  let pts = []; // {posX,posY,offX,offY}
+  const MAX_PTS = 100;
+
+  // Track pointer state
+  let isDown = false;
+  let lastPointerType = "mouse";
 
   function resize() {
-    const dpr = Math.max(1, devicePixelRatio);
-    canvas.width = innerWidth * dpr;
-    canvas.height = innerHeight * dpr;
+    const dpr = Math.max(1, devicePixelRatio || 1);
+    canvas.width = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
     canvas.style.width = innerWidth + "px";
     canvas.style.height = innerHeight + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.lineWidth = 2;
-  }
 
+    // p5 setup equivalents
+    ctx.strokeStyle = "rgb(216, 207, 255)";
+    ctx.lineWidth = 2;
+    ctx.lineJoin = "round";
+    ctx.lineCap = "round";
+  }
   addEventListener("resize", resize);
   resize();
 
-  function map(v, a1, a2, b1, b2) {
-    return a2 === a1 ? b1 : b1 + (b2 - b1) * ((v - a1) / (a2 - a1));
-  }
+  // Prevent scroll/zoom gestures while interacting with the canvas
+  canvas.style.touchAction = "none";
 
   function rand(min, max) {
     return Math.random() * (max - min) + min;
   }
 
-  function addPoint(x, y) {
-    pts.push({ posX:x, posY:y, offX:0, offY:0 });
-    if (pts.length > MAX) pts.shift();
+  function map(v, a1, a2, b1, b2) {
+    // p5 map equivalent for this use
+    if (a2 === a1) return b1;
+    return b1 + (b2 - b1) * ((v - a1) / (a2 - a1));
   }
 
-  canvas.addEventListener("pointerdown", (e) => {
-    active = true;
-    canvas.setPointerCapture(e.pointerId);
-    const r = canvas.getBoundingClientRect();
-    addPoint(e.clientX - r.left, e.clientY - r.top);
-  });
+  function addPoint(x, y) {
+    pts.push({ posX: x, posY: y, offX: 0, offY: 0 });
+    if (pts.length > MAX_PTS) pts.shift();
+  }
 
+  function localXY(e) {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  }
+
+  // Desktop hover drawing: add point on every move (like mouseMoved)
+  // Touch drawing: add point on move only while finger is down
   canvas.addEventListener("pointermove", (e) => {
-    if (!active) return;
-    const r = canvas.getBoundingClientRect();
-    addPoint(e.clientX - r.left, e.clientY - r.top);
+    lastPointerType = e.pointerType || "mouse";
+    const { x, y } = localXY(e);
+
+    if (lastPointerType === "mouse") {
+      // hover behavior (no click needed) to match your mouseMoved()
+      addPoint(x, y);
+    } else {
+      // touch/pen: only draw while pressed
+      if (isDown) addPoint(x, y);
+    }
   });
 
-  canvas.addEventListener("pointerup", () => active = false);
-  canvas.addEventListener("pointercancel", () => active = false);
-  canvas.addEventListener("pointerleave", () => active = false);
+  canvas.addEventListener("pointerdown", (e) => {
+    lastPointerType = e.pointerType || "mouse";
+    isDown = true;
+    canvas.setPointerCapture(e.pointerId);
+
+    // Start a stroke immediately on touch/pen down so it feels responsive
+    const { x, y } = localXY(e);
+    if (lastPointerType !== "mouse") addPoint(x, y);
+  });
+
+  canvas.addEventListener("pointerup", () => (isDown = false));
+  canvas.addEventListener("pointercancel", () => (isDown = false));
+  canvas.addEventListener("pointerleave", () => (isDown = false));
 
   function draw() {
-    ctx.fillStyle = "#11073b";
+    // p5 background() each frame (no fading accumulation)
+    ctx.fillStyle = "rgb(17, 7, 59)";
     ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-    ctx.strokeStyle = "rgb(216,207,255)";
+    // p5 beginShape()/vertex()/endShape()
     ctx.beginPath();
-    for (let i = 0; i < pts.length; i++) {
-      let j = map(i, 0, Math.max(1, pts.length - 1), 20, 0.5);
-      pts[i].offX += rand(-j, j);
-      pts[i].offY += rand(-j, j);
-      let x = pts[i].posX + pts[i].offX;
-      let y = pts[i].posY + pts[i].offY;
+
+    const n = pts.length;
+    const denom = Math.max(1, n - 1); // matches max(1, pts.length - 1)
+
+    for (let i = 0; i < n; i++) {
+      // EXACT same jitter mapping as your p5 code
+      const jitter = map(i, 0, denom, 20, 0.5);
+
+      // EXACT same jitter update
+      pts[i].offX += rand(-jitter, jitter);
+      pts[i].offY += rand(-jitter, jitter);
+
+      const x = pts[i].posX + pts[i].offX;
+      const y = pts[i].posY + pts[i].offY;
+
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
+
     ctx.stroke();
+
     requestAnimationFrame(draw);
   }
 
   requestAnimationFrame(draw);
 </script>
+
 </body>
 </html>
