@@ -13,155 +13,71 @@
 <script>
   const canvas = document.getElementById("c");
   const ctx = canvas.getContext("2d");
-
   const pts = [];
-  const MAX = 120;
-
-  // Cursor state (for custom cursor drawing)
-  const cursor = { x: 0, y: 0, visible: false };
-
-  // Drawing state
-  let isPointerDown = false;
-  let lastPointerType = "mouse"; // "mouse" | "touch" | "pen"
+  const MAX = 100;
+  let active = false;
 
   function resize() {
-    const dpr = Math.max(1, devicePixelRatio || 1);
-    canvas.width = Math.floor(innerWidth * dpr);
-    canvas.height = Math.floor(innerHeight * dpr);
+    const dpr = Math.max(1, devicePixelRatio);
+    canvas.width = innerWidth * dpr;
+    canvas.height = innerHeight * dpr;
     canvas.style.width = innerWidth + "px";
     canvas.style.height = innerHeight + "px";
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
     ctx.lineWidth = 2;
-    ctx.strokeStyle = "rgb(216,207,255)";
-    ctx.lineJoin = "round";
-    ctx.lineCap = "round";
   }
+
   addEventListener("resize", resize);
   resize();
 
   function map(v, a1, a2, b1, b2) {
     return a2 === a1 ? b1 : b1 + (b2 - b1) * ((v - a1) / (a2 - a1));
   }
+
   function rand(min, max) {
     return Math.random() * (max - min) + min;
   }
 
   function addPoint(x, y) {
-    pts.push({ posX: x, posY: y, offX: 0, offY: 0 });
+    pts.push({ posX:x, posY:y, offX:0, offY:0 });
     if (pts.length > MAX) pts.shift();
   }
 
-  function getLocalXY(e) {
-    const r = canvas.getBoundingClientRect();
-    return { x: e.clientX - r.left, y: e.clientY - r.top };
-  }
-
-  // Custom cursor inside iframe:
-  // hide system cursor and draw our own.
-  canvas.style.cursor = "none";
-  canvas.style.touchAction = "none";
-
-  canvas.addEventListener("pointerenter", (e) => {
-    lastPointerType = e.pointerType || "mouse";
-    if (lastPointerType === "mouse" || lastPointerType === "pen") cursor.visible = true;
-  });
-
-  canvas.addEventListener("pointerleave", () => {
-    cursor.visible = false;
-    isPointerDown = false;
-  });
-
   canvas.addEventListener("pointerdown", (e) => {
-    lastPointerType = e.pointerType || "mouse";
-    isPointerDown = true;
+    active = true;
     canvas.setPointerCapture(e.pointerId);
-
-    const { x, y } = getLocalXY(e);
-    cursor.x = x; cursor.y = y;
-
-    // On touch/pen, start drawing on press
-    addPoint(x, y);
-  });
-
-  canvas.addEventListener("pointerup", () => {
-    isPointerDown = false;
-  });
-  canvas.addEventListener("pointercancel", () => {
-    isPointerDown = false;
+    const r = canvas.getBoundingClientRect();
+    addPoint(e.clientX - r.left, e.clientY - r.top);
   });
 
   canvas.addEventListener("pointermove", (e) => {
-    lastPointerType = e.pointerType || "mouse";
-    const { x, y } = getLocalXY(e);
-
-    cursor.x = x;
-    cursor.y = y;
-
-    // Desktop: draw on hover (mouse/trackpad), no click needed
-    if (lastPointerType === "mouse") {
-      cursor.visible = true;
-      addPoint(x, y);
-      return;
-    }
-
-    // Tablet/phone: only draw while finger/stylus is down
-    if (isPointerDown) {
-      addPoint(x, y);
-    }
+    if (!active) return;
+    const r = canvas.getBoundingClientRect();
+    addPoint(e.clientX - r.left, e.clientY - r.top);
   });
 
-  function drawCustomCursor() {
-    if (!cursor.visible) return;
-
-    // Outer glow
-    ctx.save();
-    ctx.globalAlpha = 0.55;
-    ctx.beginPath();
-    ctx.arc(cursor.x, cursor.y, 14, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Inner dot
-    ctx.globalAlpha = 0.9;
-    ctx.beginPath();
-    ctx.arc(cursor.x, cursor.y, 2.5, 0, Math.PI * 2);
-    ctx.fillStyle = "rgb(216,207,255)";
-    ctx.fill();
-    ctx.restore();
-  }
+  canvas.addEventListener("pointerup", () => active = false);
+  canvas.addEventListener("pointercancel", () => active = false);
+  canvas.addEventListener("pointerleave", () => active = false);
 
   function draw() {
-    // Fade old frames slightly instead of fully clearing.
-    // Lower alpha = longer trails; higher alpha = faster fade.
-    ctx.fillStyle = "rgba(17,7,59,0.14)";
+    ctx.fillStyle = "#11073b";
     ctx.fillRect(0, 0, innerWidth, innerHeight);
 
-    // Draw the jitter trail
     ctx.strokeStyle = "rgb(216,207,255)";
     ctx.beginPath();
-
     for (let i = 0; i < pts.length; i++) {
-      const j = map(i, 0, Math.max(1, pts.length - 1), 20, 0.5);
+      let j = map(i, 0, Math.max(1, pts.length - 1), 20, 0.5);
       pts[i].offX += rand(-j, j);
       pts[i].offY += rand(-j, j);
-
-      const x = pts[i].posX + pts[i].offX;
-      const y = pts[i].posY + pts[i].offY;
-
+      let x = pts[i].posX + pts[i].offX;
+      let y = pts[i].posY + pts[i].offY;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
-
-    // Draw custom cursor last so it sits on top
-    drawCustomCursor();
-
     requestAnimationFrame(draw);
   }
-
-  // Initial solid background once (so you don't see white before first fade fill)
-  ctx.fillStyle = "rgb(17,7,59)";
-  ctx.fillRect(0, 0, innerWidth, innerHeight);
 
   requestAnimationFrame(draw);
 </script>
