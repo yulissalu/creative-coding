@@ -88,7 +88,7 @@
 
   canvas.addEventListener("pointerup", () => (isDown = false));
   canvas.addEventListener("pointercancel", () => (isDown = false));
-  canvas.addEventListener("pointerleave", () => (isDown = false));
+  canvas.addEventListener("pointerleave", () => { isDown = false; pts = []; });
 
   function draw() {
     // p5 background() each frame (no fading accumulation)
